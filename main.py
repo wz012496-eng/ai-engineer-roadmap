@@ -19,16 +19,13 @@ tasks = [
     },
 ]
 
+
 def get_tasks():
     return tasks
 
+
 def create_task(task_id, title, priority):
-    task = {
-        "id": task_id,
-        "title": title,
-        "priority": priority,
-        "completed": False
-    }
+    task = {"id": task_id, "title": title, "priority": priority, "completed": False}
     tasks.append(task)
 
 
@@ -39,31 +36,57 @@ def complete_task(task_id):
 
 
 def get_high_priority_tasks():
-    result = []	
+    result = []
     for task in get_tasks():
         if task["priority"] == "high" and not task["completed"]:
             result.append(task)
     return result
 
 
-create_task(4, "Learn FastAPI", "medium")
+def delete_task(task_id):
+    for task in get_tasks():
+        if task["id"] == task_id:
+            tasks.remove(task)
+            break
 
-print("=== All Tasks ===")
 
-for task in get_tasks():
-    print(
-        f'[{task["id"]}] '
-        f'{task["title"]} '
-        f'priority={task["priority"]} '
-        f'completed={task["completed"]}'
+def get_task_by_id(task_id):
+    for task in get_tasks():
+        if task["id"] == task_id:
+            return task
+    return None
+
+
+def get_task_stats():
+    total = len(get_tasks())
+    completed = sum(1 for task in get_tasks() if task["completed"])
+    pending = total - completed
+    high_priority = sum(
+        1
+        for task in get_tasks()
+        if task["priority"] == "high" and not task["completed"]
     )
+    return {
+        "total": total,
+        "completed": completed,
+        "pending": pending,
+        "high_priority": high_priority,
+    }
 
-print("=== Before ===")
-for task in get_high_priority_tasks():
-    print(f'[{task["id"]}] {task["title"]}')
 
-complete_task(1)
 
-print("=== After ===")
-for task in get_high_priority_tasks():
-    print(f'[{task["id"]}] {task["title"]}')
+if __name__ == "__main__":
+    task = get_task_by_id(3)
+    print(task)
+
+    print("=== Before Delete ===")
+
+    for task in get_tasks():
+        print(f"[{task['id']}] {task['title']}")
+
+    delete_task(2)
+
+    print("=== After Delete ===")
+
+    for task in get_tasks():
+        print(f"[{task['id']}] {task['title']}")
