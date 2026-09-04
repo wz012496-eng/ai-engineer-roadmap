@@ -9,21 +9,17 @@ class TaskManager:
             Task(id=3, title="Build AI Agent", priority=Priority.HIGH, completed=False),
         ]
 
-
     def get_tasks(self) -> list[Task]:
         return self.tasks
-
 
     def create_task(self, task_id: int, title: str, priority: Priority) -> None:
         task = Task(id=task_id, title=title, priority=priority, completed=False)
         self.tasks.append(task)
 
-
     def complete_task(self, task_id: int) -> None:
         for task in self.get_tasks():
             if task.id == task_id:
                 task.completed = True
-
 
     def get_high_priority_tasks(self) -> list[Task]:
         result = []
@@ -32,20 +28,17 @@ class TaskManager:
                 result.append(task)
         return result
 
-
     def delete_task(self, task_id: int) -> None:
         for task in self.get_tasks():
             if task.id == task_id:
                 self.tasks.remove(task)
                 break
 
-
     def get_task_by_id(self, task_id: int) -> Task | None:
         for task in self.get_tasks():
             if task.id == task_id:
                 return task
         return None
-
 
     def get_task_stats(self) -> dict[str, int]:
         total = len(self.get_tasks())
