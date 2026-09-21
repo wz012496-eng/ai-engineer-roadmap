@@ -1,10 +1,15 @@
-from ai_engineer_roadmap.llm import ask_llm
+from ai_engineer_roadmap.llm import suggest_task
 from ai_engineer_roadmap.task_manager import TaskManager
 
 if __name__ == "__main__":
     task_manager = TaskManager()
 
-    answer = ask_llm("给我一个学习 Python dataclass 的建议")
+    task = task_manager.get_task_by_id(3)
 
-    print("=== AI Response ===")
-    print(answer)
+    if task is not None:
+        suggestion = suggest_task(task)
+        print("=== Summary ===")
+        print(suggestion.summary)
+        print("\n=== Steps ===")
+        for step in suggestion.steps:
+            print(step)
