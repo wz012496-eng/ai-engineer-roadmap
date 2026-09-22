@@ -12,7 +12,11 @@ class TaskManager:
     def get_tasks(self) -> list[Task]:
         return self.tasks
 
-    def create_task(self, task_id: int, title: str, priority: Priority) -> None:
+    def create_task(self, title: str, priority: Priority) -> None:
+        if self.tasks:
+            task_id = max(task.id for task in self.tasks) + 1
+        else:
+            task_id = 1
         task = Task(id=task_id, title=title, priority=priority, completed=False)
         self.tasks.append(task)
 

@@ -6,7 +6,12 @@ from pydantic import ValidationError
 
 from ai_engineer_roadmap.models import Task, TaskSuggestion
 from ai_engineer_roadmap.task_manager import TaskManager
-from ai_engineer_roadmap.tools import COMPLETE_TASK_TOOL, execute_tool_call
+from ai_engineer_roadmap.tools import (
+    COMPLETE_TASK_TOOL,
+    CREATE_TASK_TOOL,
+    GET_TASKS_TOOL,
+    execute_tool_call,
+)
 
 load_dotenv()
 
@@ -28,36 +33,29 @@ def ask_llm_with_tools(prompt: str, task_manager: TaskManager) -> str:
             "content": prompt,
         }
     ]
-
-    response = client.chat.completions.create(
-        model="deepseek-v4-flash",
-        messages=messages,
-        tools=[COMPLETE_TASK_TOOL],
-    )
-
-    message = response.choices[0].message
-
-    if not message.tool_calls:
-        return message.content or ""
-
-    messages.append(message)
-
-    for tool_call in message.tool_calls:
-        result = execute_tool_call(task_manager, tool_call)
-        messages.append(
-            {
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": result,
-            }
+    while True:
+        response = client.chat.completions.create(
+            model="deepseek-v4-flash",
+            messages=messages,
+            tools=[COMPLETE_TASK_TOOL, GET_TASKS_TOOL, CREATE_TASK_TOOL],
         )
-    final_response = client.chat.completions.create(
-        model="deepseek-v4-flash",
-        messages=messages,
-        tools=[COMPLETE_TASK_TOOL],
-    )
 
-    return final_response.choices[0].message.content or ""
+        message = response.choices[0].message
+
+        if not message.tool_calls:
+            return message.content or ""
+
+        messages.append(message)
+
+        for tool_call in message.tool_calls:
+            result = execute_tool_call(task_manager, tool_call)
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": result,
+                }
+            )
 
 
 def suggest_task(task: Task) -> TaskSuggestion:
