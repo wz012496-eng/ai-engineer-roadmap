@@ -1,20 +1,31 @@
 from ai_engineer_roadmap.llm import ask_llm_with_tools
 from ai_engineer_roadmap.task_manager import TaskManager
 
+
+def trim_messages(messages: list[dict], max_length: int = 3) -> list[dict]:
+    user_indexes = []
+    for index, message in enumerate(messages):
+        if isinstance(message, dict) and message.get("role") == "user":
+            user_indexes.append(index)
+
+    if len(user_indexes) <= max_length:
+        return messages
+    split_index = user_indexes[-max_length]
+    return messages[split_index:]
+
+
 if __name__ == "__main__":
     task_manager = TaskManager()
+    messages = []
 
-    print("=== Before ===")
-    for task in task_manager.get_tasks():
-        print(task)
+    while True:
+        user_input = input("You: ")
+        if user_input == "exit":
+            break
+        messages.append({"role": "user", "content": user_input})
 
-    result = ask_llm_with_tools("创建一个低优先级任务 Buy Milk，然后告诉我现在有哪些任务", task_manager)
+        result = ask_llm_with_tools(messages, task_manager)
 
-    print()
-    print("=== AI Response ===")
-    print(result)
+        messages = trim_messages(messages, max_length=3)
 
-    print()
-    print("=== After ===")
-    for task in task_manager.get_tasks():
-        print(task)
+        print(f"AI: {result}")

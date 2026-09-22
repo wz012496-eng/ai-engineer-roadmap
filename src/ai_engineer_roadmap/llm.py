@@ -26,13 +26,7 @@ client = OpenAI(
 )
 
 
-def ask_llm_with_tools(prompt: str, task_manager: TaskManager) -> str:
-    messages = [
-        {
-            "role": "user",
-            "content": prompt,
-        }
-    ]
+def ask_llm_with_tools(messages: list[dict], task_manager: TaskManager) -> str:
     while True:
         response = client.chat.completions.create(
             model="deepseek-v4-flash",
@@ -43,6 +37,7 @@ def ask_llm_with_tools(prompt: str, task_manager: TaskManager) -> str:
         message = response.choices[0].message
 
         if not message.tool_calls:
+            messages.append(message)
             return message.content or ""
 
         messages.append(message)
