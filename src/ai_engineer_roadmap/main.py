@@ -1,15 +1,20 @@
-from ai_engineer_roadmap.llm import suggest_task
+from ai_engineer_roadmap.llm import ask_llm_with_tools
 from ai_engineer_roadmap.task_manager import TaskManager
 
 if __name__ == "__main__":
     task_manager = TaskManager()
 
-    task = task_manager.get_task_by_id(3)
+    print("=== Before ===")
+    for task in task_manager.get_tasks():
+        print(task)
 
-    if task is not None:
-        suggestion = suggest_task(task)
-        print("=== Summary ===")
-        print(suggestion.summary)
-        print("\n=== Steps ===")
-        for step in suggestion.steps:
-            print(step)
+    result = ask_llm_with_tools("Complete task 3", task_manager)
+
+    print()
+    print("=== AI Response ===")
+    print(result)
+
+    print()
+    print("=== After ===")
+    for task in task_manager.get_tasks():
+        print(task)
