@@ -20,10 +20,19 @@ class TaskManager:
         task = Task(id=task_id, title=title, priority=priority, completed=False)
         self.tasks.append(task)
 
-    def complete_task(self, task_id: int) -> None:
+    def complete_task(self, task_id: int) -> dict[str, str | bool]:
         for task in self.get_tasks():
             if task.id == task_id:
                 task.completed = True
+                return {
+                    "success": True,
+                    "message": f"Task {task_id} completed successfully.",
+                }
+
+        return {
+            "success": False,
+            "error": f"Task {task_id} does not exist.",
+        }
 
     def get_high_priority_tasks(self) -> list[Task]:
         result = []

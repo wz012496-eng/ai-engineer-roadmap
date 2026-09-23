@@ -48,7 +48,6 @@ CREATE_TASK_TOOL = {
                 },
                 "priority": {
                     "type": "string",
-                    "enum": ["low", "high"],
                     "description": "The priority of the new task",
                 },
             },
@@ -58,16 +57,37 @@ CREATE_TASK_TOOL = {
 }
 
 
+def tool_result(
+    success: bool, message: str = "", error_type: str | None = None, data=None
+) -> str:
+    result = {
+        "success": success,
+        "message": message,
+    }
+    if error_type is not None:
+        result["error_type"] = error_type
+    if data is not None:
+        result["data"] = data
+    return json.dumps(result, ensure_ascii=False)
+
+
 def complete_task_tool(task_manager: TaskManager, task_id: int) -> str:
-    task_manager.complete_task(task_id)
-    return f"Task {task_id} completed successfully."
+    result = task_manager.complete_task(task_id)
+    if result["success"]:
+        return tool_result(success=True, message=result["message"])
+    else:
+        return tool_result(
+            success=False,
+            message=result["error"],
+            error_type="TASK_NOT_FOUND",
+        )
 
 
 def get_tasks_tool(task_manager: TaskManager) -> str:
     tasks = task_manager.get_tasks()
-    result = []
+    data = []
     for task in tasks:
-        result.append(
+        data.append(
             {
                 "id": task.id,
                 "title": task.title,
@@ -75,26 +95,61 @@ def get_tasks_tool(task_manager: TaskManager) -> str:
                 "completed": task.completed,
             }
         )
-    return json.dumps(result, ensure_ascii=False)
+    return tool_result(success=True, message=f"Found {len(data)} tasks.", data=data)
 
 
 def create_task_tool(task_manager: TaskManager, title: str, priority: str) -> str:
-    task_manager.create_task(title, Priority(priority))
-    return f"Task '{title}' created successfully with priority '{priority}'."
+    try:
+        task_manager.create_task(title, Priority(priority))
+        return tool_result(
+            success=True,
+            message=f"Task '{title}' created successfully with priority '{priority}'.",
+        )
+    except ValueError:
+        return tool_result(
+            success=False,
+            message=f"Invalid priority '{priority}'. Priority must be 'low' or 'high'.",
+            error_type="INVALID_ARGUMENT",
+        )
 
 
 def execute_tool_call(task_manager: TaskManager, tool_call) -> str:
-    function_name = tool_call.function.name
-    arguments = json.loads(tool_call.function.arguments)
+    try:
+        function_name = tool_call.function.name
+        arguments = json.loads(tool_call.function.arguments)
 
-    if function_name == "complete_task":
-        return complete_task_tool(task_manager, arguments["task_id"])
+        if function_name == "complete_task":
+            return complete_task_tool(task_manager, arguments["task_id"])
 
-    if function_name == "get_tasks":
-        return get_tasks_tool(task_manager)
+        if function_name == "get_tasks":
+            return get_tasks_tool(task_manager)
 
-    if function_name == "create_task":
-        title = arguments["title"]
-        priority = arguments["priority"]
-        return create_task_tool(task_manager, title, priority)
-    return f"Unknown tool function: {function_name}"
+        if function_name == "create_task":
+            title = arguments["title"]
+            priority = arguments["priority"]
+            return create_task_tool(task_manager, title, priority)
+        return tool_result(
+            success=False,
+            message=f"Unknown tool function: {function_name}",
+            error_type="UNKNOWN_FUNCTION",
+        )
+    except json.JSONDecodeError:
+        return tool_result(
+            success=False,
+            message="Tool arguments are not valid JSON.",
+            error_type="INVALID_JSON",
+        )
+
+    except KeyError as error:
+        return tool_result(
+            success=False,
+            message=f"Missing required argument: {error}",
+            error_type="MISSING_ARGUMENT",
+        )
+
+    except (TypeError, ValueError) as error:
+        return tool_result(
+            success=False,
+            message=f"Invalid tool argument: {error}",
+            error_type="INVALID_ARGUMENT",
+        )
