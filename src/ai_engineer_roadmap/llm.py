@@ -19,6 +19,8 @@ Rules:
 
 import json
 import os
+import time
+import uuid
 
 from dotenv import load_dotenv
 from openai import APITimeoutError, OpenAI
@@ -49,9 +51,13 @@ client = OpenAI(
 
 
 def ask_llm_with_tools(messages: list[dict], task_manager: TaskManager) -> str:
-    trace = TraceLogger()
-    trace.log("Agent started")
 
+    trace_id = str(uuid.uuid4())[:8]
+    trace = TraceLogger(trace_id)
+    agent_start_time = time.perf_counter()
+
+    step = 1
+    trace.log("Agent started", step=step)
     request_messages = [
         {
             "role": "system",
@@ -60,13 +66,20 @@ def ask_llm_with_tools(messages: list[dict], task_manager: TaskManager) -> str:
         *messages,
     ]
     while True:
-        trace.log("Calling LLM...")
+        step += 1
+        print(f"[TRACE] trace_id={trace_id} step={step} Calling LLM...")
 
         try:
+            start_time = time.perf_counter()
             response = client.chat.completions.create(
                 model="deepseek-v4-flash",
                 messages=request_messages,
                 tools=[COMPLETE_TASK_TOOL, GET_TASKS_TOOL, CREATE_TASK_TOOL],
+            )
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            trace.log(
+                f"LLM finished duration_ms={duration_ms:.0f}",
+                step=step,
             )
         except APITimeoutError as e:
             trace.error(f"LLM timeout: {e}")
@@ -81,7 +94,10 @@ def ask_llm_with_tools(messages: list[dict], task_manager: TaskManager) -> str:
             content = message.content or ""
 
             trace.log(f"Final answer: {content}")
-            trace.log("Agent finished")
+
+            total_ms = (time.perf_counter() - agent_start_time) * 1000
+
+            trace.log(f"Agent finished total_ms={total_ms:.0f}")
 
             messages.append(
                 {
@@ -94,16 +110,27 @@ def ask_llm_with_tools(messages: list[dict], task_manager: TaskManager) -> str:
         request_messages.append(message)
 
         for tool_call in message.tool_calls:
+            step += 1
             trace.tool_call(
                 name=tool_call.function.name,
                 arguments=json.loads(tool_call.function.arguments),
+                step=step,
             )
 
+            tool_start_time = time.perf_counter()
+
             result = execute_tool_call(task_manager, tool_call)
+            tool_duration_ms = (time.perf_counter() - tool_start_time) * 1000
 
             trace.tool_result(
                 name=tool_call.function.name,
                 result=result,
+                step=step,
+            )
+
+            trace.log(
+                f"Tool finished duration_ms={tool_duration_ms:.2f}",
+                step=step,
             )
 
             request_messages.append(
