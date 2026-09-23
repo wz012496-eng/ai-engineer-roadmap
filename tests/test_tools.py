@@ -48,6 +48,7 @@ def test_execute_tool_call_with_missing_argument():
     assert data["error_type"] == "MISSING_ARGUMENT"
     assert "priority" in data["message"]
 
+
 def test_execute_tool_call_with_invalid_json():
     task_manager = TaskManager()
 

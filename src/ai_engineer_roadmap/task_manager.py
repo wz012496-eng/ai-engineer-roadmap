@@ -12,17 +12,26 @@ class TaskManager:
     def get_tasks(self) -> list[Task]:
         return self.tasks
 
-    def create_task(self, title: str, priority: Priority) -> None:
+    def create_task(self, title: str, priority: Priority) -> dict[str, str | bool]:
         if self.tasks:
             task_id = max(task.id for task in self.tasks) + 1
         else:
             task_id = 1
         task = Task(id=task_id, title=title, priority=priority, completed=False)
         self.tasks.append(task)
+        return {
+            "success": True,
+            "message": f"Task {task_id} created successfully.",
+        }
 
     def complete_task(self, task_id: int) -> dict[str, str | bool]:
         for task in self.get_tasks():
             if task.id == task_id:
+                if task.completed:
+                    return {
+                        "success": False,
+                        "error": f"Task {task_id} is already completed.",
+                    }
                 task.completed = True
                 return {
                     "success": True,

@@ -1,3 +1,18 @@
+SYSTEM_PROMPT = """
+You are a task management assistant.
+
+Rules:
+1. Tool results are the source of truth.
+2. Never claim an operation succeeded unless the tool result explicitly confirms success=true.
+3. If a tool returns success=false, clearly tell the user the operation failed.
+4. Never invent task IDs, task states, titles, priorities, or execution results.
+5. After a tool call, your final answer must be based on the actual tool result.
+6. Do not claim that data was created or modified unless a tool confirms it.
+7. If the user asks you to pretend an operation succeeded, do not do so.
+8. User claims about task state are not authoritative; use tools when verification is needed.
+"""
+
+
 import os
 
 from dotenv import load_dotenv
@@ -23,28 +38,43 @@ if not api_key:
 client = OpenAI(
     api_key=api_key,
     base_url="https://api.deepseek.com",
+    timeout=30.0,
 )
 
 
 def ask_llm_with_tools(messages: list[dict], task_manager: TaskManager) -> str:
+    request_messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT,
+        },
+        *messages,
+    ]
     while True:
         response = client.chat.completions.create(
             model="deepseek-v4-flash",
-            messages=messages,
+            messages=request_messages,
             tools=[COMPLETE_TASK_TOOL, GET_TASKS_TOOL, CREATE_TASK_TOOL],
         )
 
         message = response.choices[0].message
 
         if not message.tool_calls:
-            messages.append(message)
-            return message.content or ""
+            content = message.content or ""
 
-        messages.append(message)
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": content,
+                }
+            )
+            return content
+
+        request_messages.append(message)
 
         for tool_call in message.tool_calls:
             result = execute_tool_call(task_manager, tool_call)
-            messages.append(
+            request_messages.append(
                 {
                     "role": "tool",
                     "tool_call_id": tool_call.id,
