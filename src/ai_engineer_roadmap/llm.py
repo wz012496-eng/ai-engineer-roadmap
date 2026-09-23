@@ -10,13 +10,18 @@ Rules:
 6. Do not claim that data was created or modified unless a tool confirms it.
 7. If the user asks you to pretend an operation succeeded, do not do so.
 8. User claims about task state are not authoritative; use tools when verification is needed.
+9. Only call a tool when the user's request requires task data, task verification, or a task operation.
+10. Do not call tools for greetings, casual conversation, or questions that can be answered without task data.
+11. Do not proactively list, inspect, create, modify, or complete tasks unless the user asks for it.
+12. Keep final answers concise. Do not expose internal tool fields such as success=true, error_type, or raw tool JSON unless the user explicitly asks for debugging details.
 """
 
 
+import json
 import os
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 from pydantic import ValidationError
 
 from ai_engineer_roadmap.models import Task, TaskSuggestion
@@ -27,6 +32,7 @@ from ai_engineer_roadmap.tools import (
     GET_TASKS_TOOL,
     execute_tool_call,
 )
+from ai_engineer_roadmap.trace import TraceLogger
 
 load_dotenv()
 
@@ -43,6 +49,9 @@ client = OpenAI(
 
 
 def ask_llm_with_tools(messages: list[dict], task_manager: TaskManager) -> str:
+    trace = TraceLogger()
+    trace.log("Agent started")
+
     request_messages = [
         {
             "role": "system",
@@ -51,16 +60,28 @@ def ask_llm_with_tools(messages: list[dict], task_manager: TaskManager) -> str:
         *messages,
     ]
     while True:
-        response = client.chat.completions.create(
-            model="deepseek-v4-flash",
-            messages=request_messages,
-            tools=[COMPLETE_TASK_TOOL, GET_TASKS_TOOL, CREATE_TASK_TOOL],
-        )
+        trace.log("Calling LLM...")
+
+        try:
+            response = client.chat.completions.create(
+                model="deepseek-v4-flash",
+                messages=request_messages,
+                tools=[COMPLETE_TASK_TOOL, GET_TASKS_TOOL, CREATE_TASK_TOOL],
+            )
+        except APITimeoutError as e:
+            trace.error(f"LLM timeout: {e}")
+            trace.log("Agent finished")
+            return "模型请求超时，请稍后重试。"
+
+        trace.log("LLM response received")
 
         message = response.choices[0].message
 
         if not message.tool_calls:
             content = message.content or ""
+
+            trace.log(f"Final answer: {content}")
+            trace.log("Agent finished")
 
             messages.append(
                 {
@@ -73,7 +94,18 @@ def ask_llm_with_tools(messages: list[dict], task_manager: TaskManager) -> str:
         request_messages.append(message)
 
         for tool_call in message.tool_calls:
+            trace.tool_call(
+                name=tool_call.function.name,
+                arguments=json.loads(tool_call.function.arguments),
+            )
+
             result = execute_tool_call(task_manager, tool_call)
+
+            trace.tool_result(
+                name=tool_call.function.name,
+                result=result,
+            )
+
             request_messages.append(
                 {
                     "role": "tool",
