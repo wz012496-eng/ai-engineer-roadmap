@@ -1,10 +1,10 @@
 from ai_engineer_roadmap.models import Priority, Task
-from ai_engineer_roadmap.repository import TaskRepository, TaskRepositoryProtocol
+from ai_engineer_roadmap.repository import TaskRepositoryProtocol
 
 
 class TaskManager:
-    def __init__(self, repository: TaskRepositoryProtocol | None = None) -> None:
-        self.repository = repository or TaskRepository()
+    def __init__(self, repository: TaskRepositoryProtocol) -> None:
+        self.repository = repository
         self.tasks = self.repository.load_tasks()
 
     def get_tasks(self) -> list[Task]:

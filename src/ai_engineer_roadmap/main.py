@@ -1,4 +1,5 @@
 from ai_engineer_roadmap.llm import ask_llm_with_tools
+from ai_engineer_roadmap.repository import TaskRepository
 from ai_engineer_roadmap.task_manager import TaskManager
 
 
@@ -15,7 +16,8 @@ def trim_messages(messages: list[dict], max_length: int = 3) -> list[dict]:
 
 
 if __name__ == "__main__":
-    task_manager = TaskManager()
+    task_repository = TaskRepository()
+    task_manager = TaskManager(task_repository)
     messages = []
 
     while True:
