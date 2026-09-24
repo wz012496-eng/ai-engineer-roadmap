@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "title": "Learn Python",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 2,
+    "title": "Watch Netflix",
+    "priority": "low",
+    "completed": false
+  },
+  {
+    "id": 4,
+    "title": "Learn RAG",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 5,
+    "title": "Buy Milk",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 6,
+    "title": "Buy Milk",
+    "priority": "high",
+    "completed": false
+  }
+]

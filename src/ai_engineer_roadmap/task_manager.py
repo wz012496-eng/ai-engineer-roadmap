@@ -1,13 +1,44 @@
+import json
+from dataclasses import asdict
+from pathlib import Path
+
 from ai_engineer_roadmap.models import Priority, Task
 
 
 class TaskManager:
-    def __init__(self) -> None:
-        self.tasks: list[Task] = [
-            Task(id=1, title="Learn Python", priority=Priority.HIGH, completed=False),
-            Task(id=2, title="Watch Netflix", priority=Priority.LOW, completed=False),
-            Task(id=3, title="Build AI Agent", priority=Priority.HIGH, completed=False),
-        ]
+    def __init__(self, data_file: Path | None = None) -> None:
+        self.data_file = data_file or Path("tasks.json")
+        self.tasks = self.load_tasks()
+
+    def load_tasks(self) -> list[Task]:
+        if not self.data_file.exists():
+            return []
+
+        try:
+            with self.data_file.open("r", encoding="utf-8") as file:
+                data = json.load(file)
+
+            result = []
+            for item in data:
+                try:
+                    task = Task(
+                        id=item["id"],
+                        title=item["title"],
+                        priority=Priority(item["priority"]),
+                        completed=item["completed"],
+                    )
+                    result.append(task)
+                except (ValueError, KeyError, TypeError):
+                    continue
+
+            return result
+        except json.JSONDecodeError:
+            return []
+
+    def save_tasks(self) -> None:
+        data = [asdict(task) for task in self.tasks]
+        with self.data_file.open("w", encoding="utf-8") as file:
+            json.dump(data, file, ensure_ascii=False, indent=2)
 
     def get_tasks(self) -> list[Task]:
         return self.tasks
@@ -19,6 +50,7 @@ class TaskManager:
             task_id = 1
         task = Task(id=task_id, title=title, priority=priority, completed=False)
         self.tasks.append(task)
+        self.save_tasks()
         return {
             "success": True,
             "message": f"Task {task_id} created successfully.",
@@ -33,6 +65,7 @@ class TaskManager:
                         "error": f"Task {task_id} is already completed.",
                     }
                 task.completed = True
+                self.save_tasks()
                 return {
                     "success": True,
                     "message": f"Task {task_id} completed successfully.",
@@ -54,6 +87,7 @@ class TaskManager:
         for task in self.get_tasks():
             if task.id == task_id:
                 self.tasks.remove(task)
+                self.save_tasks()
                 break
 
     def get_task_by_id(self, task_id: int) -> Task | None:
