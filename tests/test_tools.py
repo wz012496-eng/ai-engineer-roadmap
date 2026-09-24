@@ -1,6 +1,7 @@
 import json
 from types import SimpleNamespace
 
+from ai_engineer_roadmap.repository import TaskRepository
 from ai_engineer_roadmap.task_manager import TaskManager
 from ai_engineer_roadmap.tools import (
     complete_task_tool,
@@ -10,7 +11,9 @@ from ai_engineer_roadmap.tools import (
 
 
 def test_complete_nonexistent_task():
-    task_manager = TaskManager()
+    repository = TaskRepository()
+
+    task_manager = TaskManager(repository)
     result = complete_task_tool(task_manager, task_id=999)
     data = json.loads(result)
 
@@ -20,7 +23,9 @@ def test_complete_nonexistent_task():
 
 
 def test_create_task_with_invalid_priority():
-    task_manager = TaskManager()
+    repository = TaskRepository()
+
+    task_manager = TaskManager(repository)
     result = create_task_tool(task_manager, title="Test Task", priority="urgent")
     data = json.loads(result)
 
@@ -35,7 +40,9 @@ def test_create_task_with_invalid_priority():
 
 
 def test_execute_tool_call_with_missing_argument():
-    task_manager = TaskManager()
+    repository = TaskRepository()
+
+    task_manager = TaskManager(repository)
 
     tool_call = SimpleNamespace(
         function=SimpleNamespace(name="create_task", arguments='{"title": "Buy Milk"}')
@@ -50,7 +57,9 @@ def test_execute_tool_call_with_missing_argument():
 
 
 def test_execute_tool_call_with_invalid_json():
-    task_manager = TaskManager()
+    repository = TaskRepository()
+
+    task_manager = TaskManager(repository)
 
     tool_call = SimpleNamespace(
         function=SimpleNamespace(
@@ -68,7 +77,9 @@ def test_execute_tool_call_with_invalid_json():
 
 
 def test_execute_unknown_tool():
-    task_manager = TaskManager()
+    repository = TaskRepository()
+
+    task_manager = TaskManager(repository)
 
     tool_call = SimpleNamespace(
         function=SimpleNamespace(
@@ -86,7 +97,9 @@ def test_execute_unknown_tool():
 
 
 def test_create_task_success():
-    task_manager = TaskManager()
+    repository = TaskRepository()
+
+    task_manager = TaskManager(repository)
 
     result = create_task_tool(task_manager, "Buy Milk", "high")
     data = json.loads(result)

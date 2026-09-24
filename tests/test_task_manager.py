@@ -1,20 +1,32 @@
 import json
+from copy import deepcopy
 
-from ai_engineer_roadmap.models import Priority
+from ai_engineer_roadmap.models import Priority, Task
+from ai_engineer_roadmap.repository import TaskRepository
 from ai_engineer_roadmap.task_manager import TaskManager
 
 
-def test_complete_task_is_persisted(tmp_path):
-    data_file = tmp_path / "tasks.json"
+class FakeTaskRepository:
+    def __init__(self) -> None:
+        self.tasks = []
 
-    task_manager = TaskManager(data_file)
+    def load_tasks(self):
+        return deepcopy(self.tasks)
+
+    def save_tasks(self, tasks: list[Task]):
+        self.tasks = deepcopy(tasks)
+
+
+def test_complete_task_is_persisted(tmp_path):
+    repository = TaskRepository()
+    task_manager = TaskManager(repository)
 
     task_manager.create_task("Build AI agent", Priority.HIGH)
 
     task_id = task_manager.get_tasks()[0].id
     task_manager.complete_task(task_id)
 
-    new_task_manager = TaskManager(data_file)
+    new_task_manager = TaskManager(repository)
 
     task = new_task_manager.get_task_by_id(task_id)
 
@@ -25,8 +37,8 @@ def test_complete_task_is_persisted(tmp_path):
 def test_load_tasks_skips_invalid_task(tmp_path):
     data_file = tmp_path / "tasks.json"
 
-    data  = [
-         {
+    data = [
+        {
             "id": 1,
             "title": "Learn Python",
             "priority": "high",
@@ -46,12 +58,10 @@ def test_load_tasks_skips_invalid_task(tmp_path):
         },
     ]
 
-    data_file.write_text(
-        json.dumps(data),
-        encoding="utf-8"
-    )
+    data_file.write_text(json.dumps(data), encoding="utf-8")
+    repository = TaskRepository(data_file)
 
-    task_manager = TaskManager(data_file)
+    task_manager = TaskManager(repository)
     tasks = task_manager.get_tasks()
 
     titles = [task.title for task in tasks]
@@ -60,3 +70,23 @@ def test_load_tasks_skips_invalid_task(tmp_path):
     assert "Learn Python" in titles
     assert "Build AI Agent" in titles
     assert "Bad Task" not in titles
+
+
+def test_complete_task_with_fake_repository():
+    repository = FakeTaskRepository()
+
+    repository.tasks = [
+        Task(
+            id=1,
+            title="Learn Python",
+            priority=Priority.HIGH,
+            completed=False,
+        )
+    ]
+
+    task_manager = TaskManager(repository)
+
+    result = task_manager.complete_task(1)
+
+    assert result["success"] is True
+    assert repository.tasks[0].completed is True

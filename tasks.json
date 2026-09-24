@@ -3,7 +3,7 @@
     "id": 1,
     "title": "Learn Python",
     "priority": "high",
-    "completed": false
+    "completed": true
   },
   {
     "id": 2,
@@ -25,6 +25,78 @@
   },
   {
     "id": 6,
+    "title": "Buy Milk",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 7,
+    "title": "Buy Milk",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 8,
+    "title": "Buy Milk",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 9,
+    "title": "Build AI agent",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 10,
+    "title": "Buy Milk",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 11,
+    "title": "Build AI agent",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 12,
+    "title": "Buy Milk",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 13,
+    "title": "Build AI agent",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 14,
+    "title": "Buy Milk",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 15,
+    "title": "Build AI agent",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 16,
+    "title": "Buy Milk",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 17,
+    "title": "Build AI agent",
+    "priority": "high",
+    "completed": false
+  },
+  {
+    "id": 18,
     "title": "Buy Milk",
     "priority": "high",
     "completed": false
