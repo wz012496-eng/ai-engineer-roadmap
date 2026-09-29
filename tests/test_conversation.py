@@ -119,3 +119,14 @@ def test_conversation_ids_returns_sorted_ids():
     store.get_or_create(1)
 
     assert store.conversation_ids() == [1, 3]
+
+
+def test_delete_removes_only_the_selected_conversation():
+    store = ConversationStore()
+    store.get_or_create(1).messages.append({"role": "user", "content": "会话 1"})
+    store.get_or_create(2).messages.append({"role": "user", "content": "会话 2"})
+
+    assert store.delete(1) is True
+    assert store.conversation_ids() == [2]
+    assert store.get_or_create(2).messages == [{"role": "user", "content": "会话 2"}]
+    assert store.delete(999) is False

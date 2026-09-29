@@ -56,3 +56,6 @@ class ConversationStore:
             data = json.load(file)
 
         return cls.from_dict(data)
+
+    def delete(self, conversation_id: int) -> bool:
+        return self._conversations.pop(conversation_id, None) is not None
