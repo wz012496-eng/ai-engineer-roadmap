@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from ai_engineer_roadmap.conversation import ConversationStore
 from ai_engineer_roadmap.llm import ask_llm_with_tools
 from ai_engineer_roadmap.repository import TaskRepository
@@ -19,7 +21,13 @@ def trim_messages(messages: list[dict], max_length: int = 3) -> list[dict]:
 if __name__ == "__main__":
     task_repository = TaskRepository()
     task_manager = TaskManager(task_repository)
-    conversation_store = ConversationStore()
+
+    conversation_file = Path("conversations.json")
+    if conversation_file.exists():
+        conversation_store = ConversationStore.load(conversation_file)
+    else:
+        conversation_store = ConversationStore()
+
     conversation = conversation_store.get_or_create(conversation_id=1)
 
     while True:
@@ -31,5 +39,6 @@ if __name__ == "__main__":
         result = ask_llm_with_tools(conversation.messages, task_manager)
 
         conversation.messages = trim_messages(conversation.messages, max_length=3)
+        conversation_store.save(conversation_file)
 
         print(f"AI: {result}")

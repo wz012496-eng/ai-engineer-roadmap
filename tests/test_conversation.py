@@ -1,4 +1,6 @@
-from ai_engineer_roadmap.conversation import ConversationStore
+import json
+
+from ai_engineer_roadmap.conversation import ConversationState, ConversationStore
 
 
 def test_get_or_create_reuses_state_for_same_id():
@@ -18,3 +20,61 @@ def test_different_ids_have_separate_messages():
 
     assert first is not second
     assert second.messages == []
+
+
+def test_conversation_state_to_dict():
+    state = ConversationState(
+        conversation_id=1, messages=[{"role": "user", "content": "你好"}]
+    )
+    assert state.to_dict() == {
+        "conversation_id": 1,
+        "messages": [{"role": "user", "content": "你好"}],
+    }
+
+
+def test_conversation_sore_to_dict():
+    store = ConversationStore()
+    first = store.get_or_create(1)
+    first.messages.append({"role": "user", "content": "你好"})
+
+    store.get_or_create(2)
+
+    assert store.to_dict() == [
+        {
+            "conversation_id": 1,
+            "messages": [{"role": "user", "content": "你好"}],
+        },
+        {
+            "conversation_id": 2,
+            "messages": [],
+        },
+    ]
+
+
+def test_conversation_store_from_dict():
+    data = [
+        {
+            "conversation_id": 1,
+            "messages": [{"role": "user", "content": "你好"}],
+        },
+        {
+            "conversation_id": 2,
+            "messages": [],
+        },
+    ]
+    store = ConversationStore.from_dict(data=data)
+    assert store.to_dict() == data
+
+
+def test_conversation_store_save(tmp_path):
+    store = ConversationStore()
+    store.get_or_create(1).messages.append({"role": "user", "content": "你好"})
+    file_path = tmp_path / "conversations.json"
+
+    store.save(file_path)
+
+    restored_store = ConversationStore.load(file_path)
+    assert restored_store.to_dict() == store.to_dict()
+
+    saved_data = json.loads(file_path.read_text(encoding="utf-8"))
+    assert saved_data == store.to_dict()
