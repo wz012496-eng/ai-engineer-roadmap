@@ -105,11 +105,18 @@ def test_create_task_success():
     data = json.loads(result)
 
     assert data["success"] is True
-    assert data["message"] == (
-        "Task 'Buy Milk' created successfully with priority 'high'."
-    )
+    assert "created successfully" in data["message"]
 
     tasks = task_manager.get_tasks()
     titles = [task.title for task in tasks]
 
     assert "Buy Milk" in titles
+
+
+def test_complete_task_tool_already_completed():
+    repository = TaskRepository()
+    task_manager = TaskManager(repository)
+
+    result = task_manager.complete_task(1)
+    assert not result.success
+    assert result.error_type == "TASK_ALREADY_COMPLETED"

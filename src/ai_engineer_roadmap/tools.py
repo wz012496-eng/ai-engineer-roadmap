@@ -1,3 +1,4 @@
+import inspect
 import json
 
 from ai_engineer_roadmap.models import Priority
@@ -73,13 +74,13 @@ def tool_result(
 
 def complete_task_tool(task_manager: TaskManager, task_id: int) -> str:
     result = task_manager.complete_task(task_id)
-    if result["success"]:
-        return tool_result(success=True, message=result["message"])
+    if result.success:
+        return tool_result(success=True, message=result.message)
     else:
         return tool_result(
             success=False,
-            message=result["error"],
-            error_type="TASK_NOT_FOUND",
+            message=result.error,
+            error_type=result.error_type,
         )
 
 
@@ -100,11 +101,8 @@ def get_tasks_tool(task_manager: TaskManager) -> str:
 
 def create_task_tool(task_manager: TaskManager, title: str, priority: str) -> str:
     try:
-        task_manager.create_task(title, Priority(priority))
-        return tool_result(
-            success=True,
-            message=f"Task '{title}' created successfully with priority '{priority}'.",
-        )
+        result = task_manager.create_task(title, Priority(priority))
+        return tool_result(success=result.success, message=result.message)
     except ValueError:
         return tool_result(
             success=False,
@@ -113,26 +111,41 @@ def create_task_tool(task_manager: TaskManager, title: str, priority: str) -> st
         )
 
 
+TOOL_HANDLERS = {
+    "complete_task": complete_task_tool,
+    "get_tasks": get_tasks_tool,
+    "create_task": create_task_tool,
+}
+
+
 def execute_tool_call(task_manager: TaskManager, tool_call) -> str:
     try:
         function_name = tool_call.function.name
         arguments = json.loads(tool_call.function.arguments)
 
-        if function_name == "complete_task":
-            return complete_task_tool(task_manager, arguments["task_id"])
+        handler = TOOL_HANDLERS.get(function_name)
 
-        if function_name == "get_tasks":
-            return get_tasks_tool(task_manager)
+        if handler is None:
+            return tool_result(
+                success=False,
+                message=f"Unknown tool function: {function_name}",
+                error_type="UNKNOWN_FUNCTION",
+            )
 
-        if function_name == "create_task":
-            title = arguments["title"]
-            priority = arguments["priority"]
-            return create_task_tool(task_manager, title, priority)
-        return tool_result(
-            success=False,
-            message=f"Unknown tool function: {function_name}",
-            error_type="UNKNOWN_FUNCTION",
-        )
+        signature = inspect.signature(handler)
+        required_params = [
+            name
+            for name, param in signature.parameters.items()
+            if name != "task_manager" and param.default is inspect.Parameter.empty
+        ]
+        for param in required_params:
+            if param not in arguments:
+                return tool_result(
+                    success=False,
+                    message=f"Missing required argument: {param}",
+                    error_type="MISSING_ARGUMENT",
+                )
+        return handler(task_manager, **arguments)
     except json.JSONDecodeError:
         return tool_result(
             success=False,

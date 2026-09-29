@@ -88,5 +88,41 @@ def test_complete_task_with_fake_repository():
 
     result = task_manager.complete_task(1)
 
-    assert result["success"] is True
+    assert result.success is True
     assert repository.tasks[0].completed is True
+
+
+def test_delete_task_success():
+    repository = FakeTaskRepository()
+    repository.tasks = [
+        Task(
+            id=1,
+            title="Learn Python",
+            priority=Priority.HIGH,
+            completed=False,
+        )
+    ]
+
+    task_manager = TaskManager(repository)
+
+    assert len(task_manager.get_tasks()) == 1
+    result = task_manager.delete_task(task_id=1)
+    assert result.success
+    assert len(task_manager.get_tasks()) == 0
+
+
+def test_delete_task_not_found():
+    repository = FakeTaskRepository()
+    repository.tasks = [
+        Task(
+            id=1,
+            title="Learn Python",
+            priority=Priority.HIGH,
+            completed=False,
+        )
+    ]
+
+    task_manager = TaskManager(repository)
+    result = task_manager.delete_task(task_id=2)
+    assert not result.success
+    assert "Task 2 does not exist." == result.error

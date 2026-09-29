@@ -22,3 +22,11 @@ class TaskSuggestion(BaseModel):
     steps: list[str] = Field(
         min_length=3, max_length=3, description="三个具体、可执行的任务步骤"
     )
+
+
+@dataclass
+class OperationResult:
+    success: bool
+    message: str | None = None
+    error: str | None = None
+    error_type: str | None = None

@@ -1,4 +1,4 @@
-from ai_engineer_roadmap.models import Priority, Task
+from ai_engineer_roadmap.models import OperationResult, Priority, Task
 from ai_engineer_roadmap.repository import TaskRepositoryProtocol
 
 
@@ -10,7 +10,7 @@ class TaskManager:
     def get_tasks(self) -> list[Task]:
         return self.tasks
 
-    def create_task(self, title: str, priority: Priority) -> dict[str, str | bool]:
+    def create_task(self, title: str, priority: Priority) -> OperationResult:
         if self.tasks:
             task_id = max(task.id for task in self.tasks) + 1
         else:
@@ -18,31 +18,31 @@ class TaskManager:
         task = Task(id=task_id, title=title, priority=priority, completed=False)
         self.tasks.append(task)
         self.repository.save_tasks(self.tasks)
-        return {
-            "success": True,
-            "message": f"Task {task_id} created successfully.",
-        }
+        return OperationResult(
+            success=True, message=f"Task {task_id} created successfully."
+        )
 
-    def complete_task(self, task_id: int) -> dict[str, str | bool]:
+    def complete_task(self, task_id: int) -> OperationResult:
         for task in self.get_tasks():
             if task.id == task_id:
                 if task.completed:
-                    return {
-                        "success": False,
-                        "error": f"Task {task_id} is already completed.",
-                    }
+                    return OperationResult(
+                        success=False,
+                        error=f"Task {task_id} is already completed.",
+                        error_type="TASK_ALREADY_COMPLETED",
+                    )
                 task.completed = True
                 self.repository.save_tasks(self.tasks)
 
-                return {
-                    "success": True,
-                    "message": f"Task {task_id} completed successfully.",
-                }
+                return OperationResult(
+                    success=True, message=f"Task {task_id} completed successfully."
+                )
 
-        return {
-            "success": False,
-            "error": f"Task {task_id} does not exist.",
-        }
+        return OperationResult(
+            success=False,
+            error=f"Task {task_id} does not exist.",
+            error_type="TASK_NOT_FOUND",
+        )
 
     def get_high_priority_tasks(self) -> list[Task]:
         result = []
@@ -51,12 +51,19 @@ class TaskManager:
                 result.append(task)
         return result
 
-    def delete_task(self, task_id: int) -> None:
+    def delete_task(self, task_id: int) -> OperationResult:
         for task in self.get_tasks():
             if task.id == task_id:
                 self.tasks.remove(task)
                 self.repository.save_tasks(self.tasks)
-                break
+                return OperationResult(
+                    success=True, message=f"Task {task_id} deleted successfully."
+                )
+        return OperationResult(
+            success=False,
+            error=f"Task {task_id} does not exist.",
+            error_type="TASK_NOT_FOUND",
+        )
 
     def get_task_by_id(self, task_id: int) -> Task | None:
         for task in self.get_tasks():
