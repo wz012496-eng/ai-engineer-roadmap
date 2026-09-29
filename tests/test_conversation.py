@@ -78,3 +78,44 @@ def test_conversation_store_save(tmp_path):
 
     saved_data = json.loads(file_path.read_text(encoding="utf-8"))
     assert saved_data == store.to_dict()
+
+
+def test_conversation_store_saves_and_loads_multiple_conversations(tmp_path):
+    file_path = tmp_path / "conversations.json"
+    store = ConversationStore()
+
+    first = store.get_or_create(1)
+    first.messages.append({"role": "user", "content": "第一段对话"})
+
+    second = store.get_or_create(2)
+    second.messages.append({"role": "user", "content": "第二段对话"})
+
+    store.save(file_path)
+    loaded_store = ConversationStore.load(file_path)
+
+    assert loaded_store.get_or_create(1).messages == [
+        {"role": "user", "content": "第一段对话"}
+    ]
+    assert loaded_store.get_or_create(2).messages == [
+        {"role": "user", "content": "第二段对话"}
+    ]
+
+
+def test_create_new_conversation_uses_next_available_id():
+    store = ConversationStore()
+    store.get_or_create(1)
+    store.get_or_create(3)
+
+    conversation = store.create_new()
+
+    assert conversation.conversation_id == 4
+    assert conversation.messages == []
+    assert store.get_or_create(4) is conversation
+
+
+def test_conversation_ids_returns_sorted_ids():
+    store = ConversationStore()
+    store.get_or_create(3)
+    store.get_or_create(1)
+
+    assert store.conversation_ids() == [1, 3]

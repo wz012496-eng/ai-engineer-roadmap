@@ -28,7 +28,31 @@ if __name__ == "__main__":
     else:
         conversation_store = ConversationStore()
 
-    conversation = conversation_store.get_or_create(conversation_id=1)
+    conversation_ids = conversation_store.conversation_ids()
+    print(f"已有会话 ID：{conversation_ids}")
+
+    while True:
+        choice = (
+            input("输入会话 ID 选择会话，输入 new 创建新会话，输入 exit 退出：")
+            .strip()
+            .lower()
+        )
+
+        if choice == "new":
+            conversation = conversation_store.create_new()
+            break
+
+        if choice.isdigit() and int(choice) in conversation_ids:
+            conversation = conversation_store.get_or_create(int(choice))
+            break
+
+        if choice == "exit":
+            print("已退出。")
+            raise SystemExit(0)
+
+        print("请输入已有的会话 ID，或输入 new。")
+    # 立即保存新建的会话，即使退出前还没发送消息
+    conversation_store.save(conversation_file)
 
     while True:
         user_input = input("You: ")

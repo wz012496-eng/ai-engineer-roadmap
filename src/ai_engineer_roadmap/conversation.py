@@ -23,6 +23,13 @@ class ConversationStore:
             )
         return self._conversations[conversation_id]
 
+    def conversation_ids(self) -> list[int]:
+        return sorted(self._conversations)
+
+    def create_new(self) -> ConversationState:
+        conversation_id = max(self._conversations, default=0) + 1
+        return self.get_or_create(conversation_id)
+
     def to_dict(self) -> list[dict[str, object]]:
         return [conversation.to_dict() for conversation in self._conversations.values()]
 
