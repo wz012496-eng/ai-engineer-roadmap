@@ -10,8 +10,8 @@ from ai_engineer_roadmap.tools import (
 )
 
 
-def test_complete_nonexistent_task():
-    repository = TaskRepository()
+def test_complete_nonexistent_task(tmp_path):
+    repository = TaskRepository(tmp_path / "tasks.json")
 
     task_manager = TaskManager(repository)
     result = complete_task_tool(task_manager, task_id=999)
@@ -22,8 +22,8 @@ def test_complete_nonexistent_task():
     assert "999" in data["message"]
 
 
-def test_create_task_with_invalid_priority():
-    repository = TaskRepository()
+def test_create_task_with_invalid_priority(tmp_path):
+    repository = TaskRepository(tmp_path / "tasks.json")
 
     task_manager = TaskManager(repository)
     result = create_task_tool(task_manager, title="Test Task", priority="urgent")
@@ -39,9 +39,8 @@ def test_create_task_with_invalid_priority():
     assert "Test Task" not in titles
 
 
-def test_execute_tool_call_with_missing_argument():
-    repository = TaskRepository()
-
+def test_execute_tool_call_with_missing_argument(tmp_path):
+    repository = TaskRepository(tmp_path / "tasks.json")
     task_manager = TaskManager(repository)
 
     tool_call = SimpleNamespace(
@@ -56,8 +55,8 @@ def test_execute_tool_call_with_missing_argument():
     assert "priority" in data["message"]
 
 
-def test_execute_tool_call_with_invalid_json():
-    repository = TaskRepository()
+def test_execute_tool_call_with_invalid_json(tmp_path):
+    repository = TaskRepository(tmp_path / "tasks.json")
 
     task_manager = TaskManager(repository)
 
@@ -76,8 +75,8 @@ def test_execute_tool_call_with_invalid_json():
     assert data["message"] == "Tool arguments are not valid JSON."
 
 
-def test_execute_unknown_tool():
-    repository = TaskRepository()
+def test_execute_unknown_tool(tmp_path):
+    repository = TaskRepository(tmp_path / "tasks.json")
 
     task_manager = TaskManager(repository)
 
@@ -96,8 +95,8 @@ def test_execute_unknown_tool():
     assert "delete_task" in data["message"]
 
 
-def test_create_task_success():
-    repository = TaskRepository()
+def test_create_task_success(tmp_path):
+    repository = TaskRepository(tmp_path / "tasks.json")
 
     task_manager = TaskManager(repository)
 
@@ -113,8 +112,23 @@ def test_create_task_success():
     assert "Buy Milk" in titles
 
 
-def test_complete_task_tool_already_completed():
-    repository = TaskRepository()
+def test_complete_task_tool_already_completed(tmp_path):
+    data_file = tmp_path / "tasks.json"
+    data_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": 1,
+                    "title": "Task already completed",
+                    "priority": "high",
+                    "completed": True,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    repository = TaskRepository(data_file)
     task_manager = TaskManager(repository)
 
     result = task_manager.complete_task(1)

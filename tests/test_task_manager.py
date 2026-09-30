@@ -18,7 +18,7 @@ class FakeTaskRepository:
 
 
 def test_complete_task_is_persisted(tmp_path):
-    repository = TaskRepository()
+    repository = TaskRepository(tmp_path / "tasks.json")
     task_manager = TaskManager(repository)
 
     task_manager.create_task("Build AI agent", Priority.HIGH)
