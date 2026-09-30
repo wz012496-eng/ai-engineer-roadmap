@@ -8,6 +8,8 @@ class ConversationState:
     conversation_id: int
     messages: list[dict] = field(default_factory=list)
     title: str = ""
+    summary: str = ""
+    summarized_message_count: int = 0
 
     def __post_init__(self) -> None:
         if not self.title:
@@ -18,6 +20,8 @@ class ConversationState:
             "conversation_id": self.conversation_id,
             "title": self.title,
             "messages": self.messages,
+            "summary": self.summary,
+            "summarized_message_count": self.summarized_message_count,
         }
 
 
@@ -53,6 +57,8 @@ class ConversationStore:
                 conversation_id=conversation_id,
                 messages=messages,
                 title=item.get("title", ""),
+                summary=item.get("summary", ""),
+                summarized_message_count=item.get("summarized_message_count", 0),
             )
         return store
 

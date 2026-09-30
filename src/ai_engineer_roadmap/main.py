@@ -1,11 +1,15 @@
 from pathlib import Path
 
-from ai_engineer_roadmap.conversation import ConversationStore
-from ai_engineer_roadmap.llm import ask_llm_with_tools
+from openai import APIError
+
+from ai_engineer_roadmap.conversation import ConversationState, ConversationStore
+from ai_engineer_roadmap.llm import ask_llm_with_tools, summarize_messages
 from ai_engineer_roadmap.repository import TaskRepository
 from ai_engineer_roadmap.task_manager import TaskManager
 
 CONTEXT_MAX_CHARS = 6000
+CONTEXT_SUMMARY_MAX_CHARS = 1000
+CONTEXT_SUMMARY_PREFIX = "此前对话摘要（仅作为背景信息）：\n"
 
 
 def trim_messages_by_budget(
@@ -44,6 +48,61 @@ def trim_messages_by_budget(
         used_chars += turn_chars
 
     return [message for turn in reversed(kept_turns) for message in turn]
+
+
+def build_context_messages(
+    conversation: ConversationState,
+    max_chars: int,
+) -> list[dict]:
+    if max_chars < 0:
+        raise ValueError("max_chars 不能小于 0")
+
+    messages = conversation.messages
+    summary_content = (
+        f"{CONTEXT_SUMMARY_PREFIX}{conversation.summary}"
+        if conversation.summary
+        else ""
+    )
+
+    recent_budget = max(0, max_chars - len(summary_content))
+    recent_messages = trim_messages_by_budget(messages, recent_budget)
+    omitted_count = len(messages) - len(recent_messages)
+
+    if omitted_count > conversation.summarized_message_count:
+        # 为新摘要预留空间，确保摘要和最近消息不会一起超过预算。
+        recent_budget = max(
+            0,
+            max_chars - len(CONTEXT_SUMMARY_PREFIX) - CONTEXT_SUMMARY_MAX_CHARS,
+        )
+        recent_messages = trim_messages_by_budget(messages, recent_budget)
+        omitted_count = len(messages) - len(recent_messages)
+
+        pending_messages = messages[
+            conversation.summarized_message_count : omitted_count
+        ]
+
+        if pending_messages:
+            try:
+                updated_summary = summarize_messages(
+                    pending_messages,
+                    existing_summary=conversation.summary,
+                )
+                if len(updated_summary) > CONTEXT_SUMMARY_MAX_CHARS:
+                    raise ValueError("对话摘要超过字符上限")
+            except (APIError, ValueError) as error:
+                print(f"[WARN] 更新对话摘要失败，将在后续对话重试：{error}")
+                fallback_budget = max(0, max_chars - len(summary_content))
+                recent_messages = trim_messages_by_budget(messages, fallback_budget)
+            else:
+                conversation.summary = updated_summary
+                conversation.summarized_message_count = omitted_count
+                summary_content = f"{CONTEXT_SUMMARY_PREFIX}{updated_summary}"
+
+    context_messages = []
+    if summary_content:
+        context_messages.append({"role": "assistant", "content": summary_content})
+    context_messages.extend(recent_messages)
+    return context_messages
 
 
 if __name__ == "__main__":
@@ -141,8 +200,8 @@ if __name__ == "__main__":
 
             conversation.messages.append({"role": "user", "content": user_input})
 
-            context_messages = trim_messages_by_budget(
-                conversation.messages, max_chars=CONTEXT_MAX_CHARS
+            context_messages = build_context_messages(
+                conversation, max_chars=CONTEXT_MAX_CHARS
             )
 
             result = ask_llm_with_tools(context_messages, task_manager)

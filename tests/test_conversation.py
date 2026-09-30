@@ -30,6 +30,8 @@ def test_conversation_state_to_dict():
         "conversation_id": 1,
         "title": "会话 1",
         "messages": [{"role": "user", "content": "你好"}],
+        "summary": "",
+        "summarized_message_count": 0,
     }
 
 
@@ -45,11 +47,15 @@ def test_conversation_sore_to_dict():
             "conversation_id": 1,
             "title": "会话 1",
             "messages": [{"role": "user", "content": "你好"}],
+            "summary": "",
+            "summarized_message_count": 0,
         },
         {
             "conversation_id": 2,
             "title": "会话 2",
             "messages": [],
+            "summary": "",
+            "summarized_message_count": 0,
         },
     ]
 
@@ -60,11 +66,15 @@ def test_conversation_store_from_dict():
             "conversation_id": 1,
             "title": "会话 1",
             "messages": [{"role": "user", "content": "你好"}],
+            "summary": "",
+            "summarized_message_count": 0,
         },
         {
             "conversation_id": 2,
             "title": "会话 2",
             "messages": [],
+            "summary": "",
+            "summarized_message_count": 0,
         },
     ]
     store = ConversationStore.from_dict(data=data)
@@ -152,3 +162,29 @@ def test_custom_title_survives_save_and_load(tmp_path):
     loaded_store = ConversationStore.load(file_path)
 
     assert loaded_store.get_or_create(1).title == "AI 学习"
+
+
+def test_conversation_summary_is_persisted():
+    store = ConversationStore.from_dict(
+        [
+            {
+                "conversation_id": 1,
+                "messages": [],
+                "summary": "用户正在开发任务管理 Agent。",
+                "summarized_message_count": 3,
+            }
+        ]
+    )
+
+    assert store.get_or_create(1).summary == "用户正在开发任务管理 Agent。"
+    assert store.to_dict()[0]["summary"] == "用户正在开发任务管理 Agent。"
+
+    assert store.get_or_create(1).summarized_message_count == 3
+    assert store.to_dict()[0]["summarized_message_count"] == 3
+
+
+def test_legacy_conversation_defaults_to_empty_summary():
+    store = ConversationStore.from_dict([{"conversation_id": 1, "messages": []}])
+
+    assert store.get_or_create(1).summary == ""
+    assert store.to_dict()[0]["summary"] == ""
