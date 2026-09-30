@@ -5,17 +5,45 @@ from ai_engineer_roadmap.llm import ask_llm_with_tools
 from ai_engineer_roadmap.repository import TaskRepository
 from ai_engineer_roadmap.task_manager import TaskManager
 
+CONTEXT_MAX_CHARS = 6000
 
-def trim_messages(messages: list[dict], max_length: int = 3) -> list[dict]:
-    user_indexes = []
-    for index, message in enumerate(messages):
-        if isinstance(message, dict) and message.get("role") == "user":
-            user_indexes.append(index)
 
-    if len(user_indexes) <= max_length:
-        return messages.copy()
-    split_index = user_indexes[-max_length]
-    return messages[split_index:]
+def trim_messages_by_budget(
+    messages: list[dict],
+    max_chars: int,
+) -> list[dict]:
+    """按 content 字符数预算保留最近的完整对话轮次。"""
+    if max_chars < 0:
+        raise ValueError("max_chars 不能小于 0")
+
+    turns: list[list[dict]] = []
+
+    for message in messages:
+        if message.get("role") == "user":
+            turns.append([message])
+        elif turns:
+            turns[-1].append(message)
+        else:
+            turns.append([message])
+
+    kept_turns: list[list[dict]] = []
+    used_chars = 0
+
+    for turn in reversed(turns):
+        turn_chars = sum(
+            len(message.get("content", ""))
+            for message in turn
+            if isinstance(message.get("content", ""), str)
+        )
+
+        # 至少保留最新一轮，避免丢掉用户刚提交的问题。
+        if kept_turns and used_chars + turn_chars > max_chars:
+            break
+
+        kept_turns.append(turn)
+        used_chars += turn_chars
+
+    return [message for turn in reversed(kept_turns) for message in turn]
 
 
 if __name__ == "__main__":
@@ -113,9 +141,8 @@ if __name__ == "__main__":
 
             conversation.messages.append({"role": "user", "content": user_input})
 
-            context_messages = trim_messages(
-                conversation.messages,
-                max_length=3,
+            context_messages = trim_messages_by_budget(
+                conversation.messages, max_chars=CONTEXT_MAX_CHARS
             )
 
             result = ask_llm_with_tools(context_messages, task_manager)
