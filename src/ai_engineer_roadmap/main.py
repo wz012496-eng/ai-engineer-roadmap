@@ -13,7 +13,7 @@ def trim_messages(messages: list[dict], max_length: int = 3) -> list[dict]:
             user_indexes.append(index)
 
     if len(user_indexes) <= max_length:
-        return messages
+        return messages.copy()
     split_index = user_indexes[-max_length]
     return messages[split_index:]
 
@@ -112,12 +112,15 @@ if __name__ == "__main__":
                 continue
 
             conversation.messages.append({"role": "user", "content": user_input})
-            result = ask_llm_with_tools(conversation.messages, task_manager)
 
-            conversation.messages = trim_messages(
+            context_messages = trim_messages(
                 conversation.messages,
                 max_length=3,
             )
+
+            result = ask_llm_with_tools(context_messages, task_manager)
+
+            conversation.messages.append({"role": "assistant", "content": result})
             conversation_store.save(conversation_file)
 
             print(f"AI: {result}")
