@@ -28,6 +28,7 @@ def test_conversation_state_to_dict():
     )
     assert state.to_dict() == {
         "conversation_id": 1,
+        "title": "会话 1",
         "messages": [{"role": "user", "content": "你好"}],
     }
 
@@ -42,10 +43,12 @@ def test_conversation_sore_to_dict():
     assert store.to_dict() == [
         {
             "conversation_id": 1,
+            "title": "会话 1",
             "messages": [{"role": "user", "content": "你好"}],
         },
         {
             "conversation_id": 2,
+            "title": "会话 2",
             "messages": [],
         },
     ]
@@ -55,10 +58,12 @@ def test_conversation_store_from_dict():
     data = [
         {
             "conversation_id": 1,
+            "title": "会话 1",
             "messages": [{"role": "user", "content": "你好"}],
         },
         {
             "conversation_id": 2,
+            "title": "会话 2",
             "messages": [],
         },
     ]
@@ -130,3 +135,20 @@ def test_delete_removes_only_the_selected_conversation():
     assert store.conversation_ids() == [2]
     assert store.get_or_create(2).messages == [{"role": "user", "content": "会话 2"}]
     assert store.delete(999) is False
+
+
+def test_conversation_store_loads_legacy_data_without_title():
+    store = ConversationStore.from_dict([{"conversation_id": 7, "messages": []}])
+
+    assert store.get_or_create(7).title == "会话 7"
+
+
+def test_custom_title_survives_save_and_load(tmp_path):
+    store = ConversationStore()
+    store.get_or_create(1).title = "AI 学习"
+    file_path = tmp_path / "conversations.json"
+
+    store.save(file_path)
+    loaded_store = ConversationStore.load(file_path)
+
+    assert loaded_store.get_or_create(1).title == "AI 学习"

@@ -30,7 +30,13 @@ if __name__ == "__main__":
 
     while True:
         conversation_ids = conversation_store.conversation_ids()
-        print(f"已有会话 ID：{conversation_ids}")
+        if conversation_ids:
+            print("已有会话：")
+            for conversation_id in conversation_ids:
+                conversation = conversation_store.get_or_create(conversation_id)
+                print(f"  [{conversation_id}] {conversation.title}")
+        else:
+            print("当前没有会话。")
 
         choice = (
             input(
@@ -74,7 +80,8 @@ if __name__ == "__main__":
 
         while True:
             user_input = input(
-                "You（输入 :back 返回会话列表，:delete 删除当前会话，exit 退出）："
+                "You（输入 :back 返回会话列表，:delete 删除当前会话，"
+                ":rename 新标题 重命名会话，exit 退出）："
             )
             command = user_input.strip().lower()
 
@@ -91,6 +98,18 @@ if __name__ == "__main__":
                 conversation_store.save(conversation_file)
                 print(f"会话 {conversation_id} 已删除。")
                 break
+
+            if command == ":rename" or command.startswith(":rename "):
+                new_title = user_input.strip()[len(":rename") :].strip()
+
+                if not new_title:
+                    print("标题不能为空，用法：:rename 新标题")
+                    continue
+
+                conversation.title = new_title
+                conversation_store.save(conversation_file)
+                print(f"会话标题已改为：{conversation.title}")
+                continue
 
             conversation.messages.append({"role": "user", "content": user_input})
             result = ask_llm_with_tools(conversation.messages, task_manager)

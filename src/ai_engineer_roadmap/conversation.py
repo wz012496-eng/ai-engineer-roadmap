@@ -7,9 +7,18 @@ from pathlib import Path
 class ConversationState:
     conversation_id: int
     messages: list[dict] = field(default_factory=list)
+    title: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.title:
+            self.title = f"会话 {self.conversation_id}"
 
     def to_dict(self) -> dict[str, object]:
-        return {"conversation_id": self.conversation_id, "messages": self.messages}
+        return {
+            "conversation_id": self.conversation_id,
+            "title": self.title,
+            "messages": self.messages,
+        }
 
 
 class ConversationStore:
@@ -43,6 +52,7 @@ class ConversationStore:
             store._conversations[conversation_id] = ConversationState(
                 conversation_id=conversation_id,
                 messages=messages,
+                title=item.get("title", ""),
             )
         return store
 
