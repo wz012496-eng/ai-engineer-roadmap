@@ -4,6 +4,7 @@ from openai import APIError
 
 from ai_engineer_roadmap.conversation import ConversationState, ConversationStore
 from ai_engineer_roadmap.llm import ask_llm_with_tools, summarize_messages
+from ai_engineer_roadmap.memory import MemoryStore
 from ai_engineer_roadmap.repository import TaskRepository
 from ai_engineer_roadmap.task_manager import TaskManager
 
@@ -115,6 +116,12 @@ if __name__ == "__main__":
     else:
         conversation_store = ConversationStore()
 
+    memory_file = Path("memories.json")
+    if memory_file.exists():
+        memory_store = MemoryStore.load_from_file(memory_file)
+    else:
+        memory_store = MemoryStore()
+
     while True:
         conversation_ids = conversation_store.conversation_ids()
         if conversation_ids:
@@ -168,7 +175,8 @@ if __name__ == "__main__":
         while True:
             user_input = input(
                 "You（输入 :back 返回会话列表，:delete 删除当前会话，"
-                ":rename 新标题 重命名会话，exit 退出）："
+                ":rename 新标题 重命名会话，:remember 标签1,标签2 | 要记住的内容，"
+                "exit 退出）："
             )
             command = user_input.strip().lower()
 
@@ -198,13 +206,33 @@ if __name__ == "__main__":
                 print(f"会话标题已改为：{conversation.title}")
                 continue
 
+            if command == ":remember" or command.startswith(":remember "):
+                pay_load = user_input.strip()[len(":remember") :].strip()
+                tag_text, separator, content = pay_load.partition("|")
+
+                if not separator or not tag_text.strip() or not content.strip():
+                    print("用法：:remember 标签1,标签2 | 要记住的内容")
+                    continue
+
+                tags = [tag.strip() for tag in tag_text.split(",") if tag.strip()]
+                memory_item = memory_store.add(content=content.strip(), tags=tags)
+                memory_store.save_to_file(memory_file)
+
+                print(f"已保存记忆 {memory_item.memory_id}")
+                continue
+
             conversation.messages.append({"role": "user", "content": user_input})
 
             context_messages = build_context_messages(
                 conversation, max_chars=CONTEXT_MAX_CHARS
             )
 
-            result = ask_llm_with_tools(context_messages, task_manager)
+            relevant_memories = memory_store.find_relevant(user_input)
+            memory_context = "\n".join(
+                f"- {item.content}" for item in relevant_memories
+            )
+
+            result = ask_llm_with_tools(context_messages, task_manager, memory_context)
 
             conversation.messages.append({"role": "assistant", "content": result})
             conversation_store.save(conversation_file)
