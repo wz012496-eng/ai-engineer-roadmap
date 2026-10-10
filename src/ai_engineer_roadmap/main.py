@@ -4,13 +4,14 @@ from openai import APIError
 
 from ai_engineer_roadmap.conversation import ConversationState, ConversationStore
 from ai_engineer_roadmap.llm import ask_llm_with_tools, summarize_messages
-from ai_engineer_roadmap.memory import MemoryStore
+from ai_engineer_roadmap.memory import MemoryItem, MemoryStore
 from ai_engineer_roadmap.repository import TaskRepository
 from ai_engineer_roadmap.task_manager import TaskManager
 
 CONTEXT_MAX_CHARS = 6000
 CONTEXT_SUMMARY_MAX_CHARS = 1000
 CONTEXT_SUMMARY_PREFIX = "此前对话摘要（仅作为背景信息）：\n"
+MEMORY_CONTEXT_MAX_CHARS = 1000
 
 
 def trim_messages_by_budget(
@@ -104,6 +105,21 @@ def build_context_messages(
         context_messages.append({"role": "assistant", "content": summary_content})
     context_messages.extend(recent_messages)
     return context_messages
+
+
+def build_memory_context(
+    memory_items: list[MemoryItem], max_chars: int = MEMORY_CONTEXT_MAX_CHARS
+) -> str:
+    if max_chars < 0:
+        raise ValueError("max_chars 不能小于 0")
+
+    selected = []
+    for item in reversed(memory_items):
+        candidate = [f"- {item.content}", *selected]
+        if len("\n".join(candidate)) <= max_chars:
+            selected = candidate
+
+    return "\n".join(selected)
 
 
 if __name__ == "__main__":
@@ -223,13 +239,15 @@ if __name__ == "__main__":
 
             conversation.messages.append({"role": "user", "content": user_input})
 
-            context_messages = build_context_messages(
-                conversation, max_chars=CONTEXT_MAX_CHARS
+            relevant_memories = memory_store.find_relevant(user_input)
+            memory_context = build_memory_context(
+                relevant_memories, max_chars=MEMORY_CONTEXT_MAX_CHARS
             )
 
-            relevant_memories = memory_store.find_relevant(user_input)
-            memory_context = "\n".join(
-                f"- {item.content}" for item in relevant_memories
+            conversation_budget = CONTEXT_MAX_CHARS - len(memory_context)
+
+            context_messages = build_context_messages(
+                conversation, max_chars=conversation_budget
             )
 
             result = ask_llm_with_tools(context_messages, task_manager, memory_context)
