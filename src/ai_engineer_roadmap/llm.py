@@ -50,6 +50,48 @@ client = OpenAI(
 )
 
 
+def _log_context_trace(
+    trace_id: str,
+    step: int,
+    messages: list[object],
+) -> None:
+    if os.getenv("AI_AGENT_CONTEXT_TRACE") != "1":
+        return
+
+    def get_field(message: object, name: str, default: object = None) -> object:
+        if isinstance(message, dict):
+            return message.get(name, default)
+        return getattr(message, name, default)
+
+    def get_content(message: object) -> str:
+        content = get_field(message, "content", "")
+        if isinstance(content, str):
+            return content
+        if content is None:
+            return ""
+        return repr(content)
+
+    total_chars = sum(len(get_content(message)) for message in messages)
+
+    print(
+        f"\n[CONTEXT] trace_id={trace_id} step={step} "
+        f"messages={len(messages)} content_chars={total_chars}"
+    )
+
+    for index, message in enumerate(messages, start=1):
+        content = get_content(message)
+        role = get_field(message, "role", "unknown")
+
+        print(f"[CONTEXT] message={index} role={role} content_chars={len(content)}")
+
+        if content:
+            print(content)
+
+        tool_calls = get_field(message, "tool_calls")
+        if tool_calls:
+            print(f"[CONTEXT] tool_calls={tool_calls!r}")
+
+
 def summarize_messages(
     messages: list[dict],
     existing_summary: str = "",
@@ -114,6 +156,7 @@ def ask_llm_with_tools(
 
         try:
             start_time = time.perf_counter()
+            _log_context_trace(trace_id, step, request_messages)
             response = client.chat.completions.create(
                 model="deepseek-v4-flash",
                 messages=request_messages,
