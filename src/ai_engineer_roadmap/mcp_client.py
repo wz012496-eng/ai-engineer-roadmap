@@ -3,6 +3,7 @@ import json
 
 from mcp import Client
 from mcp.client.stdio import StdioServerParameters
+from mcp.shared.exceptions import MCPError
 from mcp.types import Tool
 
 server_params = StdioServerParameters(
@@ -15,7 +16,18 @@ async def call_mcp_tool(
     name: str,
     arguments: dict,
 ) -> str:
-    result = await client.call_tool(name, arguments)
+    try:
+        result = await client.call_tool(name, arguments)
+    except MCPError as error:
+        return json.dumps(
+            {
+                "success": False,
+                "message": f"MCP call failed: {error}",
+                "error_type": "MCP_CALL_FAILED",
+            },
+            ensure_ascii=False,
+        )
+
     if result.is_error:
         return json.dumps(
             {

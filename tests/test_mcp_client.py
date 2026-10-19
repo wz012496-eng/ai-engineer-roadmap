@@ -1,6 +1,13 @@
+import asyncio
+
+import pytest
+from mcp.shared.exceptions import MCPError
 from mcp.types import Tool
 
-from ai_engineer_roadmap.mcp_client import mcp_tool_to_openai_tool
+from ai_engineer_roadmap.mcp_client import (
+    discover_openai_tools,
+    mcp_tool_to_openai_tool,
+)
 
 
 def test_mcp_tool_to_openai_tool_converts_tool_definition():
@@ -29,7 +36,6 @@ def test_mcp_tool_to_openai_tool_converts_tool_definition():
     }
 
 
-import asyncio
 import json
 from types import SimpleNamespace
 
@@ -74,3 +80,32 @@ def test_call_mcp_tool_wraps_mcp_error():
         "message": "['server unavailable']",
         "error_type": "MCP_CALL_FAILED",
     }
+
+
+def test_call_mcp_tool_wraps_mcp_exception():
+    class RaisingMCPClient:
+        async def call_tool(self, name, arguments):
+            raise MCPError(-32000, "connection lost")
+
+    result = asyncio.run(
+        call_mcp_tool(
+            RaisingMCPClient(),
+            "get_tasks",
+            {},
+        )
+    )
+
+    assert json.loads(result) == {
+        "success": False,
+        "message": "MCP call failed: connection lost",
+        "error_type": "MCP_CALL_FAILED",
+    }
+
+
+def test_discover_openai_tools_propagates_mcp_error():
+    class RaisingMCPClient:
+        async def list_tools(self):
+            raise MCPError(-32000, "tool discovery failed")
+
+    with pytest.raises(MCPError, match="tool discovery failed"):
+        asyncio.run(discover_openai_tools(RaisingMCPClient()))
