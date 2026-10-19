@@ -1,17 +1,30 @@
+import asyncio
 from pathlib import Path
 
+from mcp import Client
 from openai import APIError
 
 from ai_engineer_roadmap.conversation import ConversationState, ConversationStore
 from ai_engineer_roadmap.llm import ask_llm_with_tools, summarize_messages
+from ai_engineer_roadmap.mcp_client import server_params
 from ai_engineer_roadmap.memory import MemoryItem, MemoryStore
-from ai_engineer_roadmap.repository import TaskRepository
-from ai_engineer_roadmap.task_manager import TaskManager
 
 CONTEXT_MAX_CHARS = 6000
 CONTEXT_SUMMARY_MAX_CHARS = 1000
 CONTEXT_SUMMARY_PREFIX = "此前对话摘要（仅作为背景信息）：\n"
 MEMORY_CONTEXT_MAX_CHARS = 1000
+
+
+async def ask_agent_with_mcp(
+    messages: list[dict],
+    memory_context: str,
+) -> str:
+    async with Client(server_params) as mcp_client:
+        return await ask_llm_with_tools(
+            messages,
+            mcp_client,
+            memory_context,
+        )
 
 
 def trim_messages_by_budget(
@@ -123,9 +136,6 @@ def build_memory_context(
 
 
 if __name__ == "__main__":
-    task_repository = TaskRepository()
-    task_manager = TaskManager(task_repository)
-
     conversation_file = Path("conversations.json")
     if conversation_file.exists():
         conversation_store = ConversationStore.load(conversation_file)
@@ -250,7 +260,7 @@ if __name__ == "__main__":
                 conversation, max_chars=conversation_budget
             )
 
-            result = ask_llm_with_tools(context_messages, task_manager, memory_context)
+            result = asyncio.run(ask_agent_with_mcp(context_messages, memory_context))
 
             conversation.messages.append({"role": "assistant", "content": result})
             conversation_store.save(conversation_file)

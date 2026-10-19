@@ -23,17 +23,12 @@ import time
 import uuid
 
 from dotenv import load_dotenv
+from mcp import Client
 from openai import APITimeoutError, OpenAI
 from pydantic import ValidationError
 
+from ai_engineer_roadmap.mcp_client import call_mcp_tool, discover_openai_tools
 from ai_engineer_roadmap.models import Task, TaskSuggestion
-from ai_engineer_roadmap.task_manager import TaskManager
-from ai_engineer_roadmap.tools import (
-    COMPLETE_TASK_TOOL,
-    CREATE_TASK_TOOL,
-    GET_TASKS_TOOL,
-    execute_tool_call,
-)
 from ai_engineer_roadmap.trace import TraceLogger
 
 load_dotenv()
@@ -126,8 +121,8 @@ def summarize_messages(
     return summary.strip()
 
 
-def ask_llm_with_tools(
-    messages: list[dict], task_manager: TaskManager, memory_context: str = ""
+async def ask_llm_with_tools(
+    messages: list[dict], mcp_client: Client, memory_context: str = ""
 ) -> str:
 
     trace_id = str(uuid.uuid4())[:8]
@@ -150,6 +145,7 @@ def ask_llm_with_tools(
         },
         *messages,
     ]
+    openai_tools = await discover_openai_tools(mcp_client)
     while True:
         step += 1
         print(f"[TRACE] trace_id={trace_id} step={step} Calling LLM...")
@@ -160,7 +156,7 @@ def ask_llm_with_tools(
             response = client.chat.completions.create(
                 model="deepseek-v4-flash",
                 messages=request_messages,
-                tools=[COMPLETE_TASK_TOOL, GET_TASKS_TOOL, CREATE_TASK_TOOL],
+                tools=openai_tools,
             )
             duration_ms = (time.perf_counter() - start_time) * 1000
             trace.log(
@@ -197,16 +193,35 @@ def ask_llm_with_tools(
 
         for tool_call in message.tool_calls:
             step += 1
-            trace.tool_call(
-                name=tool_call.function.name,
-                arguments=json.loads(tool_call.function.arguments),
-                step=step,
-            )
 
             tool_start_time = time.perf_counter()
 
-            result = execute_tool_call(task_manager, tool_call)
+            try:
+                arguments = json.loads(tool_call.function.arguments)
+            except json.JSONDecodeError:
+                arguments = {}
+                result = json.dumps(
+                    {
+                        "success": False,
+                        "message": "Tool arguments are not valid JSON.",
+                        "error_type": "INVALID_JSON",
+                    },
+                    ensure_ascii=False,
+                )
+            else:
+                result = await call_mcp_tool(
+                    mcp_client,
+                    tool_call.function.name,
+                    arguments,
+                )
+
             tool_duration_ms = (time.perf_counter() - tool_start_time) * 1000
+
+            trace.tool_call(
+                name=tool_call.function.name,
+                arguments=arguments,
+                step=step,
+            )
 
             trace.tool_result(
                 name=tool_call.function.name,
