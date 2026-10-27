@@ -1,6 +1,11 @@
+import asyncio
+import runpy
+import sys
 from importlib import import_module
 
 import pytest
+from mcp.client.stdio import StdioServerParameters
+from mcp.shared.exceptions import MCPError
 
 from ai_engineer_roadmap.memory import MemoryItem
 
@@ -112,3 +117,223 @@ def test_build_memory_context_preserves_order_when_items_fit():
     ]
     expected = "- 甲\n- 乙"
     assert main_module.build_memory_context(items, max_chars=len(expected)) == expected
+
+
+def test_ask_agent_with_mcp_reports_mcp_error(monkeypatch):
+
+    class FakeClient:
+        def __init__(self, params):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return False
+
+    async def failing_ask(messages, mcp_client, memory_context):
+        raise MCPError(-32000, "tool discovery failed")
+
+    monkeypatch.setattr(main_module, "Client", FakeClient)
+    monkeypatch.setattr(main_module, "ask_llm_with_tools", failing_ask)
+
+    result = asyncio.run(
+        main_module.ask_agent_with_mcp([{"role": "user", "content": "查看任务"}], "")
+    )
+
+    assert result == "MCP 工具暂时不可用，请稍后重试。"
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    [TypeError, ValueError, OSError, FileNotFoundError],
+)
+def test_ask_agent_with_mcp_propagates_unhandled_errors(monkeypatch, error_type):
+    class FakeClient:
+        def __init__(self, params):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return False
+
+    async def failing_ask(messages, mcp_client, memory_context):
+        raise error_type("unexpected bug")
+
+    monkeypatch.setattr(main_module, "Client", FakeClient)
+    monkeypatch.setattr(main_module, "ask_llm_with_tools", failing_ask)
+
+    with pytest.raises(error_type, match="unexpected bug"):
+        asyncio.run(
+            main_module.ask_agent_with_mcp(
+                [{"role": "user", "content": "查看任务"}],
+                "",
+            )
+        )
+
+
+def test_ask_agent_with_mcp_preserves_normal_result(monkeypatch):
+    received = {}
+    lifecycle = []
+
+    class FakeClient:
+        def __init__(self, params):
+            pass
+
+        async def __aenter__(self):
+            lifecycle.append("entered")
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            lifecycle.append("exited")
+            return False
+
+    async def successful_ask(messages, mcp_client, memory_context):
+        received["messages"] = messages
+        received["memory_context"] = memory_context
+        assert isinstance(mcp_client, FakeClient)
+        return "这是正常回答。"
+
+    monkeypatch.setattr(main_module, "Client", FakeClient)
+    monkeypatch.setattr(main_module, "ask_llm_with_tools", successful_ask)
+
+    messages = [{"role": "user", "content": "查看任务"}]
+    memory_context = "用户偏好简洁回答。"
+
+    result = asyncio.run(main_module.ask_agent_with_mcp(messages, memory_context))
+
+    assert result == "这是正常回答。"
+    assert received["messages"] is messages
+    assert received["memory_context"] == memory_context
+    assert lifecycle == ["entered", "exited"]
+
+
+def test_ask_agent_with_mcp_reports_server_start_failure(monkeypatch):
+    class FailingClient:
+        def __init__(self, params):
+            pass
+
+        async def __aenter__(self):
+            raise FileNotFoundError("uv executable not found")
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return False
+
+    async def unexpected_ask(messages, mcp_client, memory_context):
+        raise AssertionError("连接失败后不应调用 Agent")
+
+    monkeypatch.setattr(main_module, "Client", FailingClient)
+    monkeypatch.setattr(main_module, "ask_llm_with_tools", unexpected_ask)
+
+    result = asyncio.run(
+        main_module.ask_agent_with_mcp(
+            [{"role": "user", "content": "查看任务"}],
+            "",
+        )
+    )
+
+    assert result == "MCP 服务启动失败，请检查本地启动配置。"
+
+
+def test_ask_agent_with_real_mcp_client_reports_error(monkeypatch, tmp_path):
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "ai_engineer_roadmap.mcp_server"],
+        cwd=tmp_path,
+    )
+
+    async def failing_ask(messages, mcp_client, memory_context):
+        raise MCPError(-32000, "tool discovery failed")
+
+    monkeypatch.setattr(main_module, "server_params", params)
+    monkeypatch.setattr(main_module, "ask_llm_with_tools", failing_ask)
+
+    result = asyncio.run(
+        asyncio.wait_for(
+            main_module.ask_agent_with_mcp(
+                [{"role": "user", "content": "查看任务"}],
+                "",
+            ),
+            timeout=20,
+        )
+    )
+
+    assert result == "MCP 工具暂时不可用，请稍后重试。"
+
+
+def test_ask_agent_with_real_client_preserves_mixed_errors(monkeypatch, tmp_path):
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "ai_engineer_roadmap.mcp_server"],
+        cwd=tmp_path,
+    )
+
+    async def failing_ask(messages, mcp_client, memory_context):
+        raise ExceptionGroup(
+            "mixed failure",
+            [
+                MCPError(-32000, "tool discovery failed"),
+                TypeError("unexpected bug"),
+            ],
+        )
+
+    monkeypatch.setattr(main_module, "server_params", params)
+    monkeypatch.setattr(main_module, "ask_llm_with_tools", failing_ask)
+
+    with pytest.raises(ExceptionGroup) as caught:
+        asyncio.run(
+            asyncio.wait_for(
+                main_module.ask_agent_with_mcp(
+                    [{"role": "user", "content": "查看任务"}],
+                    "",
+                ),
+                timeout=20,
+            )
+        )
+
+    assert caught.value.subgroup(TypeError) is not None
+    assert caught.value.subgroup(MCPError) is not None
+
+
+def test_cli_continues_after_mcp_failure(monkeypatch, tmp_path, capsys):
+    class FakeClient:
+        def __init__(self, params):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            return False
+
+    received_inputs = []
+
+    async def fake_ask(messages, mcp_client, memory_context):
+        received_inputs.append(messages[-1]["content"])
+
+        if len(received_inputs) == 1:
+            raise MCPError(-32000, "tool discovery failed")
+
+        return "这是重试后的正常回答。"
+
+    user_inputs = iter(["new", "查看任务", "再试一次", "exit"])
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(user_inputs))
+    monkeypatch.setattr("mcp.Client", FakeClient)
+    monkeypatch.setattr(
+        "ai_engineer_roadmap.llm.ask_llm_with_tools",
+        fake_ask,
+    )
+
+    with pytest.raises(SystemExit) as caught:
+        runpy.run_path(main_module.__file__, run_name="__main__")
+
+    output = capsys.readouterr().out
+
+    assert caught.value.code == 0
+    assert received_inputs == ["查看任务", "再试一次"]
+    assert "AI: MCP 工具暂时不可用，请稍后重试。" in output
+    assert "AI: 这是重试后的正常回答。" in output

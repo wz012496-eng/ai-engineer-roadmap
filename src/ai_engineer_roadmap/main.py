@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 
 from mcp import Client
+from mcp.shared.exceptions import MCPError
 from openai import APIError
 
 from ai_engineer_roadmap.conversation import ConversationState, ConversationStore
@@ -19,12 +20,26 @@ async def ask_agent_with_mcp(
     messages: list[dict],
     memory_context: str,
 ) -> str:
-    async with Client(server_params) as mcp_client:
-        return await ask_llm_with_tools(
-            messages,
-            mcp_client,
-            memory_context,
-        )
+    connection_established = False
+    try:
+        async with Client(server_params) as mcp_client:
+            connection_established = True
+            return await ask_llm_with_tools(
+                messages,
+                mcp_client,
+                memory_context,
+            )
+    except MCPError:
+        return "MCP 工具暂时不可用，请稍后重试。"
+    except ExceptionGroup as error:
+        _, unhandled = error.split(MCPError)
+        if unhandled is not None:
+            raise
+        return "MCP 工具暂时不可用，请稍后重试。"
+    except OSError:
+        if connection_established:
+            raise
+        return "MCP 服务启动失败，请检查本地启动配置。"
 
 
 def trim_messages_by_budget(
