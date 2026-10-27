@@ -12,6 +12,7 @@ dependencies = [
     "openai>=3.8.0",
     "pydantic>=2.13.5",
     "python-dotenv>=1.2.3",
+    "sentence-transformers>=6.2.0",
 ]
 
 [project.scripts]
