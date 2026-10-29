@@ -8,6 +8,7 @@ wheels/
 conversations.json
 memories.json
 tasks.json
+vectors.json
 
 # Virtual environments
 .venv
