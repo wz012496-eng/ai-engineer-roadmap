@@ -57,3 +57,46 @@ def test_search_returns_highest_scores(tmp_path, top_k, expected_ids, expected_s
 
     assert [result.record.record_id for result in results] == expected_ids
     assert [result.score for result in results] == pytest.approx(expected_scores)
+
+
+def test_search_with_filters_before_top_k(tmp_path):
+    path = tmp_path / "vectors.json"
+    repository = VectorRepository(path)
+    repository.save(
+        [
+            VectorRecord(
+                "A", "美食", [1.0, 0.0], {"category": "food", "source": "note"}
+            ),
+            VectorRecord(
+                "B",
+                "Android 笔记",
+                [4.0, 3.0],
+                {"category": "Android", "source": "note"},
+            ),
+            VectorRecord(
+                "C",
+                "Android 文章",
+                [9.0, 1.0],
+                {"category": "Android", "source": "article"},
+            ),
+        ]
+    )
+
+    results = VectorRepository(path).search(
+        [1.0, 0.0], top_k=1, filters={"category": "Android", "source": "note"}
+    )
+
+    assert [result.record.record_id for result in results] == ["B"]
+    assert results[0].score == pytest.approx(0.8)
+
+
+def test_load_old_record_without_metadata(tmp_path):
+    path = tmp_path / "vectors.json"
+    path.write_text(
+        '[{"record_id":"old","content":"旧记录","embedding":[1.0,0.0]}]',
+        encoding="utf-8",
+    )
+
+    repository = VectorRepository(path)
+    assert repository.load()[0].metadata == {}
+    assert repository.search([1.0, 0.0], filters={"category": "Android"}) == []

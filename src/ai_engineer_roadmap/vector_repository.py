@@ -1,5 +1,5 @@
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from ai_engineer_roadmap.similarity import cosine_similarity
@@ -10,6 +10,7 @@ class VectorRecord:
     record_id: str
     content: str
     embedding: list[float]
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -37,7 +38,12 @@ class VectorRepository:
 
         return [VectorRecord(**item) for item in data]
 
-    def search(self, query_vector: list[float], top_k: int = 3) -> list[SearchResult]:
+    def search(
+        self,
+        query_vector: list[float],
+        top_k: int = 3,
+        filters: dict[str, str] | None = None,
+    ) -> list[SearchResult]:
         if top_k < 1:
             raise ValueError("top_k 必须大于等于 1")
 
@@ -45,6 +51,10 @@ class VectorRepository:
         results = []
 
         for record in records:
+            if filters and any(
+                record.metadata.get(key) != value for key, value in filters.items()
+            ):
+                continue
             score = cosine_similarity(query_vector, record.embedding)
             results.append(SearchResult(record, score))
 
