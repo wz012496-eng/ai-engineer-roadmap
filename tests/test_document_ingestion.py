@@ -1,6 +1,6 @@
 import pytest
 
-from ai_engineer_roadmap.document_ingestion import load_markdown
+from ai_engineer_roadmap.document_ingestion import chunk_markdown, load_markdown
 
 
 def test_load_markdown(tmp_path):
@@ -22,3 +22,43 @@ def test_load_empty_markdown(tmp_path):
         load_markdown(md_file)
 
     assert str(error.value) == f"Empty document: {md_file}"
+
+
+def test_chunk_markdown(tmp_path):
+    # Create a temporary markdown file
+    md_file = tmp_path / "test.md"
+    md_file.write_text("ABCDEFGHIJ", encoding="utf-8")
+
+    document = load_markdown(md_file)
+    chunks = chunk_markdown(document, chunk_size=5, overlap=2)
+
+    assert len(chunks) == 3
+    assert chunks[0]["content"] == "ABCDE"
+    assert chunks[1]["content"] == "DEFGH"
+    assert chunks[2]["content"] == "GHIJ"
+
+    assert chunks[0]["index"] == 0
+    assert chunks[1]["index"] == 1
+    assert chunks[2]["index"] == 2
+
+    assert chunks[0]["source"] == str(md_file)
+    assert chunks[1]["source"] == str(md_file)
+    assert chunks[2]["source"] == str(md_file)
+
+
+def test_chunk_markdown_invalid_parameters(tmp_path):
+    # Create a temporary markdown file
+    md_file = tmp_path / "test.md"
+    md_file.write_text("ABCDEFGHIJ", encoding="utf-8")
+
+    document = load_markdown(md_file)
+
+    with pytest.raises(ValueError) as error:
+        chunk_markdown(document, chunk_size=5, overlap=5)
+    assert str(error.value) == "Overlap must be non-negative and less than chunk size."
+
+
+def test_chunk_markdown_short_document():
+    assert chunk_markdown(
+        {"content": "AB", "source": "short.md"}, chunk_size=5, overlap=2
+    ) == [{"content": "AB", "source": "short.md", "index": 0}]
